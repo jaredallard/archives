@@ -1,0 +1,7 @@
+name: archives
+arguments:
+  library: true
+  license: LGPL-3.0
+  org: jaredallard
+modules:
+  - name: github.com/rgst-io/stencil-golang
