@@ -13,7 +13,7 @@
 	<img alt="Codecov" src="https://img.shields.io/codecov/c/github/jaredallard/archives?style=for-the-badge">
 </a>
 
-<br />
+&nbsp;
 
 Go library for extracting archives (tar, zip, etc.)
 
