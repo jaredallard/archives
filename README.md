@@ -5,8 +5,6 @@
 [![Github Workflow Status](https://img.shields.io/github/actions/workflow/status/jaredallard/archives/tests.yaml?style=for-the-badge)](https://github.com/jaredallard/archives/actions/workflows/tests.yaml)
 [![Codecov](https://img.shields.io/codecov/c/github/jaredallard/archives?style=for-the-badge)](https://app.codecov.io/gh/jaredallard/archives)
 
-&nbsp;
-
 Go library for extracting archives (tar, zip, etc.)
 
 ## Usage
