@@ -7,9 +7,22 @@
 
 Go library for extracting archives (tar, zip, etc.)
 
+## Supported Archive Types
+
+* `tar`
+  * `tar.xz`
+  * `tar.bz2`
+  * `tar.gz`
+
 ## Usage
 
 See our [Go docs](https://pkg.go.dev/github.com/jaredallard/archives).
+
+### cgo
+
+cgo is used for extracting `xz` archives by default. If you wish to not
+use cgo, simply set `CGO_ENABLED` to `0`. This library will
+automatically use a pure-GO implementation instead.
 
 ## License
 
