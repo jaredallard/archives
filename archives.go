@@ -30,7 +30,7 @@ import (
 // Configures extractors supported by this package and values
 // initialized by the init function.
 var (
-	extractors = []Archiver{&tar{}}
+	extractors = []Archiver{&tar{}, &zip{}}
 	extensions = map[string]Archiver{}
 )
 
