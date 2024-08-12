@@ -17,23 +17,21 @@
 // SPDX-License-Identifier: LGPL-3.0
 
 // Package archives provides functions for working with compressed
-// archives. It is a wrapper around various packages purely for
-// extracting archives.
+// archives.
 package archives
 
 import (
+	"errors"
 	"fmt"
 	"io"
-	"os"
-	"path/filepath"
 	"strings"
 )
 
 // Configures extractors supported by this package and values
 // initialized by the init function.
 var (
-	extractors = []Extractor{&tarExtractor{}}
-	extensions = map[string]Extractor{}
+	extractors = []Archiver{&tar{}}
+	extensions = map[string]Archiver{}
 )
 
 // init initializes calls all extractors to register their supported
@@ -46,70 +44,125 @@ func init() {
 	}
 }
 
+// OpenOptions contains the options for opening an archive.
+type OpenOptions struct {
+	// Extension is the extension of the archive to extract. This is
+	// required.
+	//
+	// Extension should be complete, including the leading period. For
+	// example:
+	//		 .tar
+	// 		 .tar.gz
+	Extension string
+}
+
 // ExtractOptions contains the options for extracting an archive.
 type ExtractOptions struct {
-	// Reader is the io.Reader to read the archive from. Either [Reader]
-	// or [Path] must be provided.
-	Reader io.Reader
-
-	// Extension is the extension of the archive to extract. This
-	// overrides the extension detection from [Path] if provided. This is
-	// required if [Reader] is provided.
+	// Extension is the extension of the archive to extract. This is
+	// required.
+	//
+	// Extension should be complete, including the leading period. For
+	// example:
+	//		 .tar
+	// 		 .tar.gz
 	Extension string
 
-	// Path is the path to the archive to extract. Either [Reader] or
-	// [Path] must be provided.
-	Path string
+	// PreservePermissions, if set, will preserve the permissions of the
+	// files in the archive.
+	//
+	// Defaults to true.
+	PreservePermissions *bool
+
+	// PreserveOwnership, if set, will preserve the ownership of the files
+	// in the archive. If false, the files will be owned by the user
+	// running the program.
+	//
+	// Defaults to false.
+	PreserveOwnership bool
 }
 
-// Extract extracts an archive to the provided destination.
-func Extract(opts ExtractOptions, dest string) error {
-	if opts.Reader == nil && opts.Path == "" {
-		return fmt.Errorf("either reader or path must be provided")
+// ptr returns a pointer to the provided value.
+func ptr[T comparable](v T) *T {
+	return &v
+}
+
+// applyDefaults applies the default values to the provided options.
+func applyDefaults(opts *ExtractOptions) {
+	if opts.PreservePermissions == nil {
+		opts.PreservePermissions = ptr(true)
+	}
+}
+
+// Open opens an archive from the provided reader. The underlying
+// [Archiver] is determined by the extension of the archive.
+func Open(r io.Reader, opts OpenOptions) (Archive, error) {
+	if r == nil {
+		return nil, fmt.Errorf("reader must not be nil")
+	} else if opts.Extension == "" {
+		return nil, fmt.Errorf("extension must be provided (set opts.Extension)")
 	}
 
-	if opts.Reader != nil && opts.Path != "" {
-		return fmt.Errorf("only one of reader or path can be provided")
+	ext := strings.TrimPrefix(opts.Extension, ".")
+
+	archiver, ok := extensions[ext]
+	if !ok || archiver == nil {
+		return nil, fmt.Errorf("unsupported archive extension: %s", ext)
+	}
+	return archiver.Open(r, ext)
+}
+
+// Extract extracts an archive to the provided destination. The
+// underlying [Archiver] is determined by the extension of the archive.
+func Extract(r io.Reader, dest string, opts ExtractOptions) error {
+	applyDefaults(&opts)
+
+	a, err := Open(r, OpenOptions{
+		Extension: opts.Extension,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to open archive: %w", err)
 	}
 
-	ext := opts.Extension
-	if opts.Reader != nil {
-		if ext == "" {
-			return fmt.Errorf("extension must be provided when using a reader (set opts.Extension)")
-		}
-	} else if opts.Path != "" && ext == "" {
-		// If not set, default to the extension of the provided path.
-		ext = filepath.Ext(opts.Path)
-	}
-	ext = strings.TrimPrefix(ext, ".")
+	return extract(a, dest, &opts)
+}
 
-	// Read the file from disk if Path is provided.
-	if opts.Path != "" {
-		r, err := os.Open(opts.Path)
+// PickFilterFn is a function that filters files in an archive.
+type PickFilterFn func(*Header) bool
+
+// Pick returns an [io.Reader] that returns a specific file from the
+// provided [Archive]. The file is determined by the provided filter
+// function.
+//
+// If the caller intends to pick one file from an archive, they should
+// also make sure to close the archive after they are done with the
+// returned [io.Reader] to prevent resource leaks.
+func Pick(a Archive, filter PickFilterFn) (io.Reader, error) {
+	for {
+		h, err := a.Next()
 		if err != nil {
-			return fmt.Errorf("failed to open archive: %w", err)
+			if errors.Is(err, io.EOF) {
+				return nil, fmt.Errorf("file not found in archive")
+			}
+
+			return nil, fmt.Errorf("failed to read archive header: %w", err)
 		}
-		defer r.Close()
 
-		opts.Reader = r
-	}
+		// Only consider files.
+		if h.Type != HeaderFile {
+			continue
+		}
 
-	for eext, extractor := range extensions {
-		if ext == eext {
-			return extractor.Extract(opts.Reader, ext, dest)
+		if filter(h) {
+			// Return the same archive since [archive.Next] progressed the
+			// reader to the file. This is a convenience to the caller.
+			return a, nil
 		}
 	}
-
-	return fmt.Errorf("unsupported archive extension: %s", ext)
 }
 
-// Extractor is an interface for extracting archives.
-type Extractor interface {
-	// Extract extracts all files from the provided reader to the
-	// destination.
-	Extract(r io.Reader, ext, dest string) error
-
-	// Extensions should return a list of supported extensions for this
-	// extractor.
-	Extensions() []string
+// PickFilterByName returns a [PickFilterFn] that filters files by name.
+func PickFilterByName(name string) PickFilterFn {
+	return func(h *Header) bool {
+		return h.Name == name
+	}
 }

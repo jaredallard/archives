@@ -19,98 +19,81 @@
 package archives
 
 import (
-	"archive/tar"
-	"errors"
+	stdtar "archive/tar"
 	"fmt"
 	"io"
-	"os"
-	"path/filepath"
 )
 
-// _ ensures that tarExtractor implements the [Extractor] interface.
-var _ Extractor = (&tarExtractor{})
+// _ ensures that tar implements the [Archiver] interface.
+var _ Archiver = (&tar{})
 
-// TarExtractor implements the [Extractor] interface for tar archives.
-type tarExtractor struct{}
+// tar implements the [Archiver] interface for tar archives and their
+// compressed variants.
+type tar struct{}
 
 // Extensions returns the supported extensions for the tar extractor.
-func (t *tarExtractor) Extensions() []string {
-	return []string{"tar", "tgz", "gz", "xz", "tbz2", "bz2"}
+func (t *tar) Extensions() []string {
+	return []string{"tar", "tgz", "tar.gz", "txz", "tar.xz", "tbz2", "tar.bz2"}
 }
 
-func (t *tarExtractor) Extract(r io.Reader, ext, dest string) error {
+func (t *tar) Open(r io.Reader, ext string) (Archive, error) {
+	// Determine if we're dealing with a compressed tar archive and if so,
+	// create the appropriate reader.
 	var container io.ReadCloser
 	switch ext {
 	case "tar":
 		container = io.NopCloser(r)
-	case "tgz", "gz":
+	case "tgz", "tar.gz":
 		var err error
 		container, err = newGzipReader(r)
 		if err != nil {
-			return fmt.Errorf("failed to create gzip reader: %w", err)
+			return nil, fmt.Errorf("failed to create gzip reader: %w", err)
 		}
-	case "tbz2", "bz2":
+	case "tbz2", "tar.bz2":
 		container = newBzip2Reader(r)
-	case "txz", "xz":
+	case "txz", "tar.xz":
 		var err error
 		container, err = newXZReader(r)
 		if err != nil {
-			return fmt.Errorf("failed to create xz reader: %w", err)
+			return nil, fmt.Errorf("failed to create xz reader: %w", err)
 		}
 	default:
 		// This only happens if we're missing a case in the switch statement.
-		return fmt.Errorf("unsupported tar extension: %s", ext)
-	}
-	defer container.Close()
-
-	tr := tar.NewReader(container)
-	for {
-		h, err := tr.Next()
-		if err != nil {
-			if errors.Is(err, io.EOF) {
-				break
-			}
-
-			return fmt.Errorf("failed to read tar header: %w", err)
-		}
-
-		path := filepath.Join(dest, h.Name)
-		switch h.Typeflag {
-		case tar.TypeDir:
-			if err := os.MkdirAll(path, h.FileInfo().Mode()); err != nil {
-				return fmt.Errorf("failed to create directory: %w", err)
-			}
-		case tar.TypeReg:
-			// Sometimes the directory entry is missing, so we need to create it.
-			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-				return fmt.Errorf("failed to create directory: %w", err)
-			}
-
-			f, err := os.Create(path)
-			if err != nil {
-				return fmt.Errorf("failed to create file: %w", err)
-			}
-
-			if _, err := io.Copy(f, tr); err != nil {
-				_ = f.Close() //nolint:errcheck // Why: Best effort to close the file.
-				return fmt.Errorf("failed to copy file contents: %w", err)
-			}
-
-			if err := f.Close(); err != nil {
-				return fmt.Errorf("failed to close file: %w", err)
-			}
-		default:
-			return fmt.Errorf("unsupported file type in package (%s: %v)", h.Name, h.Typeflag)
-		}
-
-		if err := os.Chmod(path, os.FileMode(h.Mode)); err != nil {
-			return fmt.Errorf("failed to set file permissions: %w", err)
-		}
-
-		if err := os.Chtimes(path, h.AccessTime, h.ModTime); err != nil {
-			return fmt.Errorf("failed to set file times: %w", err)
-		}
+		return nil, fmt.Errorf("unsupported tar extension: %s", ext)
 	}
 
-	return nil
+	tr := stdtar.NewReader(container)
+	return &tarArchive{tr, container}, nil
+}
+
+type tarArchive struct {
+	*stdtar.Reader
+	closer io.Closer
+}
+
+func (t *tarArchive) Close() error {
+	return t.closer.Close()
+}
+
+func (t *tarArchive) Next() (*Header, error) {
+	h, err := t.Reader.Next()
+	if err != nil {
+		return nil, err
+	}
+
+	hType := HeaderFile
+	if h.FileInfo().IsDir() {
+		hType = HeaderDir
+	}
+
+	return &Header{
+		Name:       h.Name,
+		Type:       hType,
+		Mode:       h.FileInfo().Mode(),
+		Size:       h.Size,
+		AccessTime: h.AccessTime,
+		ModTime:    h.ModTime,
+		UID:        h.Uid,
+		GID:        h.Gid,
+	}, nil
 }
