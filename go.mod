@@ -1,6 +1,6 @@
 module github.com/jaredallard/archives
 
-go 1.22
+go 1.21
 
 require (
 	github.com/jamespfennell/xz v0.1.2
