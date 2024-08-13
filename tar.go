@@ -33,7 +33,7 @@ type tar struct{}
 
 // Extensions returns the supported extensions for the tar extractor.
 func (t *tar) Extensions() []string {
-	return []string{"tar", "tgz", "tar.gz", "txz", "tar.xz", "tbz2", "tar.bz2"}
+	return []string{"tar", "tgz", "tar.gz", "txz", "tar.xz", "tbz2", "tar.bz2", "tar.zst"}
 }
 
 func (t *tar) Open(r io.Reader, ext string) (Archive, error) {
@@ -56,6 +56,12 @@ func (t *tar) Open(r io.Reader, ext string) (Archive, error) {
 		container, err = newXZReader(r)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create xz reader: %w", err)
+		}
+	case "tar.zst":
+		var err error
+		container, err = newZstdReader(r)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create zstd reader: %w", err)
 		}
 	default:
 		// This only happens if we're missing a case in the switch statement.

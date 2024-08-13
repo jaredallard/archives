@@ -24,6 +24,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"path/filepath"
 	"strings"
 )
 
@@ -49,10 +50,10 @@ type OpenOptions struct {
 	// Extension is the extension of the archive to extract. This is
 	// required.
 	//
-	// Extension should be complete, including the leading period. For
-	// example:
-	//		 .tar
-	// 		 .tar.gz
+	// Extension should be complete, including the leading period. This
+	// should be the output of [Ext] to ensure that the extension contains
+	// all formats (e.g., .tar.gz and .zip). If you opt to use
+	// [filepath.Ext] it will not include the second extension.
 	Extension string
 }
 
@@ -91,6 +92,28 @@ func applyDefaults(opts *ExtractOptions) {
 	if opts.PreservePermissions == nil {
 		opts.PreservePermissions = ptr(true)
 	}
+}
+
+// Ext returns the extension of a file name based on the supported
+// extensions in this package. If the extension is not supported, the
+// output of [filepath.Ext] will be returned instead.
+//
+// Examples:
+//
+//	archives.Ext("file.tar.gz")   // ".tar.gz"
+//	archives.Ext("file.zip")      // ".zip"
+//	archives.Ext("file.unknown")  // ".unknown"
+func Ext(name string) string {
+	// try supported extensions first
+	for ext := range extensions {
+		if strings.HasSuffix(name, ext) {
+			// Return leading period to match [filepath.Ext].
+			return "." + ext
+		}
+	}
+
+	// fallback to filepath.Ext
+	return strings.ToLower(filepath.Ext(name))
 }
 
 // Open opens an archive from the provided reader. The underlying

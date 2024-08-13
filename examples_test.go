@@ -3,12 +3,14 @@ package archives_test
 import (
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 
 	"github.com/jaredallard/archives"
 	"github.com/jaredallard/archives/internal/tartest"
 )
 
-func Example() {
+func ExamplePick() {
 	tarArchive, err := tartest.Create()
 	if err != nil {
 		panic(err)
@@ -34,6 +36,38 @@ func Example() {
 		panic(err)
 	}
 	fmt.Println(string(b))
+
+	// Output:
+	// hello world
+}
+
+func ExampleExtract() {
+	tarArchive, err := tartest.Create()
+	if err != nil {
+		panic(err)
+	}
+
+	// Create a temporary directory to extract the archive to.
+	tmpDir, err := os.MkdirTemp("", "archives-test")
+	if err != nil {
+		panic(err)
+	}
+	defer os.RemoveAll(tmpDir) // Remove the temporary directory when done.
+
+	// Open the archive.
+	if err := archives.Extract(tarArchive, tmpDir, archives.ExtractOptions{
+		Extension: ".tar",
+	}); err != nil {
+		panic(err)
+	}
+
+	// Read the extracted file.
+	got, err := os.ReadFile(filepath.Join(tmpDir, "file.txt"))
+	if err != nil {
+		panic(err)
+	}
+
+	fmt.Println(string(got))
 
 	// Output:
 	// hello world

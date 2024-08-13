@@ -4,6 +4,7 @@ go 1.21
 
 require (
 	github.com/jamespfennell/xz v0.1.2
+	github.com/klauspost/compress v1.17.9
 	github.com/ulikunitz/xz v0.5.12
 	gotest.tools/v3 v3.5.1
 )

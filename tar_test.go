@@ -19,6 +19,7 @@ func TestTarContainers(t *testing.T) {
 		{tartest.ContainerGz, "gz"},
 		{tartest.ContainerXz, "xz"},
 		{tartest.ContainerBz2, "bz2"},
+		{tartest.ContainerZstd, "zst"},
 	}
 	for _, container := range containers {
 		t.Run(container.ext, func(t *testing.T) {

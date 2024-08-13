@@ -22,6 +22,8 @@ import (
 	"compress/bzip2"
 	"compress/gzip"
 	"io"
+
+	"github.com/klauspost/compress/zstd"
 )
 
 // newGzipReader creates a new gzip reader from the provided reader.
@@ -32,4 +34,13 @@ func newGzipReader(r io.Reader) (io.ReadCloser, error) {
 // newBzip2Reader creates a new bzip2 reader from the provided reader.
 func newBzip2Reader(r io.Reader) io.ReadCloser {
 	return io.NopCloser(bzip2.NewReader(r))
+}
+
+// newZstdReader creates a new zstd reader from the provided reader.
+func newZstdReader(r io.Reader) (io.ReadCloser, error) {
+	r, err := zstd.NewReader(r)
+	if err != nil {
+		return nil, err
+	}
+	return io.NopCloser(r), nil
 }

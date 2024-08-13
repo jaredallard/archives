@@ -1,6 +1,7 @@
 package archives_test
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -50,4 +51,36 @@ func TestCanExtractFromTar(t *testing.T) {
 	assert.NilError(t, err)
 
 	assert.Equal(t, string(got), "hello world")
+}
+
+func TestExt(t *testing.T) {
+	type testCase struct {
+		name     string // defaults to filename if not set
+		filename string
+		expected string
+	}
+
+	testCases := []testCase{
+		{
+			filename: "file.tar.gz",
+			expected: ".tar.gz",
+		},
+		{
+			filename: "file.zip",
+			expected: ".zip",
+		},
+		{
+			filename: "file.unknown",
+			expected: ".unknown",
+		},
+	}
+	for _, tc := range testCases {
+		if tc.name == "" {
+			tc.name = fmt.Sprintf("should return %q for %q", tc.expected, tc.filename)
+		}
+
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, archives.Ext(tc.filename), tc.expected)
+		})
+	}
 }

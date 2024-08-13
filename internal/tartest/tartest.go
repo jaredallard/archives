@@ -27,6 +27,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/klauspost/compress/zstd"
 	xznocgo "github.com/ulikunitz/xz"
 )
 
@@ -41,6 +42,8 @@ const (
 	ContainerXz
 	// ContainerBz2 is a tar archive compressed with bzip2.
 	ContainerBz2
+	// ContainerZstd is a tar archive compressed with zstd.
+	ContainerZstd
 )
 
 type Options struct {
@@ -82,6 +85,12 @@ func Create(options ...OptionFn) (io.Reader, error) {
 		container, err = newBzip2Writer(buf)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create bzip2 writer: %w", err)
+		}
+	case ContainerZstd:
+		var err error
+		container, err = zstd.NewWriter(buf)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create zstd writer: %w", err)
 		}
 	}
 
