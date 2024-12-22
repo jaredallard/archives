@@ -9,12 +9,12 @@ Go library for extracting archives (tar, zip, etc.)
 
 ## Supported Archive Types
 
-* `tar`
-  * `tar.xz`  - xz
-  * `tar.bz2` - bzip2
-  * `tar.gz`  - gzip
-  * `tar.zst` - zstd
-* `zip`
+- `tar`
+  - `tar.xz` - xz
+  - `tar.bz2` - bzip2
+  - `tar.gz` - gzip
+  - `tar.zst` - zstd
+- `zip`
 
 ## Usage
 
