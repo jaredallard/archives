@@ -71,7 +71,7 @@ func Create(options ...OptionFn) (io.Reader, error) {
 	buf := new(bytes.Buffer)
 
 	var container io.WriteCloser
-	switch opts.Container {
+	switch opts.Container { //nolint:exhaustive // Why: None is zero value.
 	case ContainerGz:
 		container = gzip.NewWriter(buf)
 	case ContainerXz:

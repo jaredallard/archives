@@ -99,7 +99,7 @@ func (z *zipArchive) Next() (*Header, error) {
 	return &Header{
 		Name:    f.Name,
 		Type:    fType,
-		Size:    int64(f.UncompressedSize64),
+		Size:    int64(f.UncompressedSize64), // #nosec // Why: Not an overflow.
 		Mode:    f.Mode(),
 		ModTime: f.Modified,
 	}, nil

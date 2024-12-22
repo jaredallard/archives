@@ -37,6 +37,8 @@ var (
 
 // init initializes calls all extractors to register their supported
 // extensions.
+//
+//nolint:gochecknoinits // Why: This is acceptable for this package.
 func init() {
 	for i := range extractors {
 		for _, ext := range extractors[i].Extensions() {
