@@ -31,6 +31,7 @@ import (
 	xznocgo "github.com/ulikunitz/xz"
 )
 
+// Container represents the container of a tar file.
 type Container int
 
 const (
@@ -46,10 +47,12 @@ const (
 	ContainerZstd
 )
 
+// Options is a struct for interacting with containers.
 type Options struct {
 	Container Container
 }
 
+// OptionFn modifies a [Options] struct.
 type OptionFn func(*Options)
 
 // WithContainer denotes that a specific container should be used when
@@ -99,7 +102,7 @@ func Create(options ...OptionFn) (io.Reader, error) {
 		tw = tar.NewWriter(buf)
 	} else {
 		tw = tar.NewWriter(container)
-		defer container.Close()
+		defer container.Close() //nolint:errcheck // Why: Best effort
 	}
 
 	contents := []byte("hello world")

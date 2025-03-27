@@ -24,7 +24,21 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 )
+
+// sanitizeArchivePath sanitizes the provided archive file pathing from
+// "G305: Zip Slip vulnerability".
+//
+// See: https://github.com/securego/gosec/issues/324
+func sanitizeArchivePath(d, t string) (v string, err error) {
+	v = filepath.Join(d, t)
+	if strings.HasPrefix(v, filepath.Clean(d)) {
+		return v, nil
+	}
+
+	return "", fmt.Errorf("%s: %s", "content filepath is tainted", t)
+}
 
 // extract contains low level logic for extracting archives.
 func extract(a Archive, dest string, opts *ExtractOptions) error {
@@ -38,18 +52,27 @@ func extract(a Archive, dest string, opts *ExtractOptions) error {
 			return fmt.Errorf("failed to read archive header: %w", err)
 		}
 
-		path := filepath.Join(dest, h.Name)
+		path, err := sanitizeArchivePath(dest, h.Name)
+		if err != nil {
+			return err
+		}
+
 		switch h.Type {
 		case HeaderDir:
+			//nolint:gosec // Why: acceptable, we're a tar extractor.
 			if err := os.MkdirAll(path, h.Mode); err != nil {
 				return fmt.Errorf("failed to create directory: %w", err)
 			}
 		case HeaderFile:
-			// Sometimes the directory entry is missing, so we need to create it.
+			// Sometimes the directory entry is missing, so we need to create
+			// it.
+			//
+			//nolint:gosec // Why: acceptable, we're a tar extractor.
 			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 				return fmt.Errorf("failed to create directory: %w", err)
 			}
 
+			//nolint:gosec // Why: acceptable, we're a tar extractor.
 			f, err := os.Create(path)
 			if err != nil {
 				return fmt.Errorf("failed to create file: %w", err)
