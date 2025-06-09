@@ -2,7 +2,7 @@ module github.com/jaredallard/archives
 
 go 1.22
 
-toolchain go1.24.3
+toolchain go1.24.4
 
 require (
 	github.com/jamespfennell/xz v0.1.2
