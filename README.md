@@ -1,10 +1,5 @@
 # archives
 
-[![Latest Version](https://img.shields.io/github/v/release/jaredallard/archives?style=for-the-badge)](https://github.com/jaredallard/archives/releases)
-[![License](https://img.shields.io/github/license/jaredallard/archives?style=for-the-badge)](https://github.com/jaredallard/archives/blob/main/LICENSE)
-[![Github Workflow Status](https://img.shields.io/github/actions/workflow/status/jaredallard/archives/tests.yaml?style=for-the-badge)](https://github.com/jaredallard/archives/actions/workflows/tests.yaml)
-[![Codecov](https://img.shields.io/codecov/c/github/jaredallard/archives?style=for-the-badge)](https://app.codecov.io/gh/jaredallard/archives)
-
 Go library for extracting archives (tar, zip, etc.)
 
 ## Supported Archive Types
@@ -96,8 +91,8 @@ automatically use a pure-Go implementation instead.
 
 LGPL-3.0
 
-[archives.Ext]: https://pkg.go.dev/github.com/jaredallard/archives#Ext
-[archives.Pick]: https://pkg.go.dev/github.com/jaredallard/archives#Pick
+[archives.Ext]: https://pkg.go.dev/go.rgst.io/jaredallard/archives/v2#Ext
+[archives.Pick]: https://pkg.go.dev/go.rgst.io/jaredallard/archives/v2#Pick
 [io.Reader]: https://pkg.go.dev/io#Reader
-[pkg.go.dev]: https://pkg.go.dev/github.com/jaredallard/archives
+[pkg.go.dev]: https://pkg.go.dev/go.rgst.io/jaredallard/archives/v2
 [tar.Reader]: https://pkg.go.dev/archive/tar#Reader

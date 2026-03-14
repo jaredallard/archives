@@ -1,4 +1,4 @@
-module github.com/jaredallard/archives
+module go.rgst.io/jaredallard/archives/v2
 
 go 1.23
 

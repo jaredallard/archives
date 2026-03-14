@@ -6,7 +6,7 @@ import (
 	"io"
 	"testing"
 
-	"github.com/jaredallard/archives"
+	"go.rgst.io/jaredallard/archives/v2"
 	"gotest.tools/v3/assert"
 )
 

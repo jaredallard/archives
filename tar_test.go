@@ -5,7 +5,7 @@ import (
 	"os/exec"
 	"testing"
 
-	"github.com/jaredallard/archives/internal/tartest"
+	"go.rgst.io/jaredallard/archives/v2/internal/tartest"
 	"gotest.tools/v3/assert"
 )
 
