@@ -2,8 +2,6 @@ module go.rgst.io/jaredallard/archives/v2
 
 go 1.24
 
-toolchain go1.26.3
-
 require (
 	github.com/jamespfennell/xz v0.1.2
 	github.com/klauspost/compress v1.18.6
