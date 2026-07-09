@@ -89,7 +89,7 @@ automatically use a pure-Go implementation instead.
 
 ## License
 
-LGPL-3.0
+MPL-2.0
 
 [archives.Ext]: https://pkg.go.dev/go.rgst.io/jaredallard/archives/v2#Ext
 [archives.Pick]: https://pkg.go.dev/go.rgst.io/jaredallard/archives/v2#Pick
