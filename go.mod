@@ -4,7 +4,7 @@ go 1.24
 
 require (
 	github.com/jamespfennell/xz v0.1.2
-	github.com/klauspost/compress v1.19.1
+	github.com/klauspost/compress v1.19.2
 	github.com/ulikunitz/xz v0.5.16
 	gotest.tools/v3 v3.5.2
 )
