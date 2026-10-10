@@ -16,7 +16,6 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
-	"runtime"
 	"slices"
 	"strings"
 )
@@ -41,9 +40,10 @@ type extractor struct {
 	a    Archive
 	root *os.Root
 
-	// perms, owner and sync mirror [ExtractOptions]. syncDirs is true if
-	// directories should also be synced, which Windows does not support.
-	perms, owner, sync, syncDirs bool
+	// perms and owner mirror [ExtractOptions]. syncFiles and syncDirs are
+	// true if entries should be synced individually, which depends on
+	// the platform (see syncEachFile and syncEachDir).
+	perms, owner, syncFiles, syncDirs bool
 
 	// dirs contains every directory that was created or written to
 	// during extraction, keyed by its local name. The value is the
@@ -68,13 +68,13 @@ func extract(a Archive, dest string, opts *ExtractOptions) error {
 	defer root.Close()
 
 	x := &extractor{
-		a:        a,
-		root:     root,
-		perms:    *opts.PreservePermissions,
-		owner:    opts.PreserveOwnership,
-		sync:     opts.Sync,
-		syncDirs: opts.Sync && runtime.GOOS != "windows",
-		dirs:     map[string]*Header{".": nil},
+		a:         a,
+		root:      root,
+		perms:     *opts.PreservePermissions,
+		owner:     opts.PreserveOwnership,
+		syncFiles: opts.Sync && syncEachFile,
+		syncDirs:  opts.Sync && syncEachDir,
+		dirs:      map[string]*Header{".": nil},
 	}
 	for {
 		h, err := a.Next()
@@ -91,7 +91,17 @@ func extract(a Archive, dest string, opts *ExtractOptions) error {
 		}
 	}
 
-	return x.finalizeDirs()
+	if err := x.finalizeDirs(); err != nil {
+		return err
+	}
+
+	if opts.Sync {
+		if err := syncFinal(root); err != nil {
+			return fmt.Errorf("failed to sync destination: %w", err)
+		}
+	}
+
+	return nil
 }
 
 // extractEntry extracts a single entry from the archive. Entries are
@@ -246,8 +256,8 @@ func (x *extractor) extractFile(name string, h *Header) error {
 		return err
 	}
 
-	if x.sync {
-		if err := f.Sync(); err != nil {
+	if x.syncFiles {
+		if err := syncEntry(f); err != nil {
 			return fmt.Errorf("failed to sync file: %w", err)
 		}
 	}
@@ -343,7 +353,7 @@ func (x *extractor) finalizeDir(name string, h *Header) error {
 	}
 
 	if x.syncDirs {
-		if err := d.Sync(); err != nil {
+		if err := syncEntry(d); err != nil {
 			return fmt.Errorf("failed to sync directory: %w", err)
 		}
 	}

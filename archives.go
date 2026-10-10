@@ -73,10 +73,17 @@ type ExtractOptions struct {
 	// Defaults to false.
 	PreserveOwnership bool
 
-	// Sync, if set, will fsync every extracted file and directory before
-	// returning so that the extracted contents are durable (e.g., when
-	// restoring a disk). This can be significantly slower, especially on
-	// macOS where a full flush to the storage device is performed.
+	// Sync, if set, ensures that the extracted contents are durable on
+	// stable storage before returning (e.g., when restoring a disk).
+	//
+	// On Linux, this is a single syncfs(2) of the filesystem containing
+	// the destination once extraction completes. This also writes back
+	// unrelated dirty data on that filesystem, does not cover other
+	// filesystems mounted inside the destination, and only reports
+	// write errors on Linux 5.8+. On macOS, every extracted file and
+	// directory is fsynced, followed by a single flush of the storage
+	// device's cache. On other platforms, every extracted file and
+	// directory (except on Windows) is fsynced.
 	//
 	// Defaults to false.
 	Sync bool
