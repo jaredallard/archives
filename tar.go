@@ -19,6 +19,9 @@ import (
 // _ ensures that tar implements the [Archiver] interface.
 var _ Archiver = (&tar{})
 
+// _ ensures that tar supports compression levels.
+var _ levelArchiver = (&tar{})
+
 // tar implements the [Archiver] interface for tar archives and their
 // compressed variants.
 type tar struct{}
@@ -67,23 +70,33 @@ func (t *tar) Open(r io.Reader, ext string) (Archive, error) {
 // NewWriter returns an [ArchiveWriter] that writes a tar archive,
 // compressed according to ext, to w.
 func (t *tar) NewWriter(w io.Writer, ext string) (ArchiveWriter, error) {
+	return t.newWriter(w, ext, CompressionDefault)
+}
+
+// newWriter returns an [ArchiveWriter] that writes a tar archive,
+// compressed according to ext with level, to w.
+func (t *tar) newWriter(w io.Writer, ext string, level CompressionLevel) (ArchiveWriter, error) {
 	var container io.WriteCloser
 	switch ext {
 	case "tar":
 		container = nopWriteCloser{w}
 	case "tgz", "tar.gz":
-		container = newGzipWriter(w)
+		var err error
+		container, err = newGzipWriter(w, level)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create gzip writer: %w", err)
+		}
 	case "tbz2", "tar.bz2":
 		return nil, fmt.Errorf("creating bzip2 archives is not supported")
 	case "txz", "tar.xz":
 		var err error
-		container, err = newXZWriter(w)
+		container, err = newXZWriter(w, level)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create xz writer: %w", err)
 		}
 	case "tar.zst":
 		var err error
-		container, err = newZstdWriter(w)
+		container, err = newZstdWriter(w, level)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create zstd writer: %w", err)
 		}

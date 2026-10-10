@@ -18,7 +18,7 @@ import (
 
 // create writes every entry in src to aw. Entries are written in
 // lexical order and symlinks are never followed.
-func create(aw ArchiveWriter, src string) error {
+func create(aw ArchiveWriter, src string, opts *CreateOptions) error {
 	root, err := os.OpenRoot(src)
 	if err != nil {
 		return fmt.Errorf("failed to open source: %w", err)
@@ -34,12 +34,12 @@ func create(aw ArchiveWriter, src string) error {
 			return nil
 		}
 
-		return createEntry(aw, fsys, name)
+		return createEntry(aw, fsys, name, opts)
 	})
 }
 
 // createEntry writes the entry at name in fsys to aw.
-func createEntry(aw ArchiveWriter, fsys fs.FS, name string) error {
+func createEntry(aw ArchiveWriter, fsys fs.FS, name string, opts *CreateOptions) error {
 	fi, err := fs.Lstat(fsys, name)
 	if err != nil {
 		return fmt.Errorf("failed to stat %s: %w", name, err)
@@ -49,6 +49,11 @@ func createEntry(aw ArchiveWriter, fsys fs.FS, name string) error {
 		Name:    name,
 		Mode:    fi.Mode() & (fs.ModePerm | fs.ModeSetuid | fs.ModeSetgid | fs.ModeSticky),
 		ModTime: fi.ModTime(),
+	}
+	if opts.PreserveOwnership {
+		if uid, gid, ok := fileOwner(fi); ok {
+			h.UID, h.GID = uid, gid
+		}
 	}
 
 	//nolint:exhaustive // Why: All other types are unsupported.

@@ -27,7 +27,18 @@ func newXZReader(r io.Reader) (io.ReadCloser, error) {
 	return io.NopCloser(wr), nil
 }
 
-// newXZWriter creates a new xz writer that writes to w.
-func newXZWriter(w io.Writer) (io.WriteCloser, error) {
-	return xz.NewWriter(w)
+// newXZWriter creates a new xz writer that writes to w. The pure-Go
+// encoder has no compression levels, so level only controls the
+// dictionary size, matching that of the equivalent liblzma preset.
+func newXZWriter(w io.Writer, level CompressionLevel) (io.WriteCloser, error) {
+	dictCap := 8 << 20
+	switch level { //nolint:exhaustive // Why: Default is the initial value.
+	case CompressionFastest:
+		dictCap = 256 << 10
+	case CompressionBetter:
+		dictCap = 16 << 20
+	case CompressionBest:
+		dictCap = 64 << 20
+	}
+	return xz.WriterConfig{DictCap: dictCap}.NewWriter(w)
 }

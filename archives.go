@@ -59,6 +59,13 @@ type WriterOptions struct {
 	//		 .tar
 	// 		 .tar.gz
 	Extension string
+
+	// CompressionLevel is the level to compress the archive with. It is
+	// ignored for uncompressed archives (e.g., .tar). For xz archives
+	// created without CGO, the level only controls the dictionary size.
+	//
+	// Defaults to [CompressionDefault].
+	CompressionLevel CompressionLevel
 }
 
 // CreateOptions contains the options for creating an archive from a
@@ -72,6 +79,19 @@ type CreateOptions struct {
 	//		 .tar
 	// 		 .tar.gz
 	Extension string
+
+	// CompressionLevel is the level to compress the archive with. See
+	// [WriterOptions.CompressionLevel].
+	//
+	// Defaults to [CompressionDefault].
+	CompressionLevel CompressionLevel
+
+	// PreserveOwnership, if set, stores the user and group ID of each
+	// entry. Ownership is only stored by formats that support it (e.g.,
+	// tar) and only on platforms that expose it (unix).
+	//
+	// Defaults to false.
+	PreserveOwnership bool
 }
 
 // ExtractOptions contains the options for extracting an archive.
@@ -188,9 +208,17 @@ func NewWriter(w io.Writer, opts WriterOptions) (ArchiveWriter, error) {
 		return nil, fmt.Errorf("writer must not be nil")
 	}
 
+	if err := opts.CompressionLevel.validate(); err != nil {
+		return nil, err
+	}
+
 	archiver, ext, err := archiverFor(opts.Extension)
 	if err != nil {
 		return nil, err
+	}
+
+	if la, ok := archiver.(levelArchiver); ok {
+		return la.newWriter(w, ext, opts.CompressionLevel)
 	}
 	return archiver.NewWriter(w, ext)
 }
@@ -223,19 +251,20 @@ func Extract(r io.Reader, dest string, opts ExtractOptions) error {
 //
 // Symlinks are never followed. They are stored as symlinks with their
 // target exactly as it is on disk, even if it points outside of src or
-// does not exist. Ownership is not stored and hard links are stored as
+// does not exist. Ownership is only stored if
+// [CreateOptions.PreserveOwnership] is set and hard links are stored as
 // regular files. Device nodes, FIFOs and sockets are not supported and
 // cause an error. w must not write into src.
 func Create(w io.Writer, src string, opts CreateOptions) error {
-	//nolint:staticcheck // Why: CreateOptions will gain fields WriterOptions doesn't have.
 	aw, err := NewWriter(w, WriterOptions{
-		Extension: opts.Extension,
+		Extension:        opts.Extension,
+		CompressionLevel: opts.CompressionLevel,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create archive: %w", err)
 	}
 
-	if err := create(aw, src); err != nil {
+	if err := create(aw, src, &opts); err != nil {
 		aw.Close() //nolint:errcheck // Why: Best effort, already failed.
 		return err
 	}

@@ -11,6 +11,7 @@ package archives
 import (
 	stdzip "archive/zip"
 	"bytes"
+	"compress/flate"
 	"fmt"
 	"io"
 	"io/fs"
@@ -24,6 +25,9 @@ const maxZipSymlinkTarget = 4096
 
 // _ ensures that zip implements the [Archiver] interface.
 var _ Archiver = (&zip{})
+
+// _ ensures that zip supports compression levels.
+var _ levelArchiver = (&zip{})
 
 // zip implements the [Archiver] interface for zip archives.
 type zip struct{}
@@ -120,8 +124,21 @@ func (z *zipArchive) Next() (*Header, error) {
 }
 
 // NewWriter returns an [ArchiveWriter] that writes a zip archive to w.
-func (z *zip) NewWriter(w io.Writer, _ string) (ArchiveWriter, error) {
-	return &zipWriter{zw: stdzip.NewWriter(w)}, nil
+func (z *zip) NewWriter(w io.Writer, ext string) (ArchiveWriter, error) {
+	return z.newWriter(w, ext, CompressionDefault)
+}
+
+// newWriter returns an [ArchiveWriter] that writes a zip archive,
+// compressed with level, to w.
+func (z *zip) newWriter(w io.Writer, _ string, level CompressionLevel) (ArchiveWriter, error) {
+	zw := stdzip.NewWriter(w)
+	if level != CompressionDefault {
+		lvl := deflateLevel(level)
+		zw.RegisterCompressor(stdzip.Deflate, func(w io.Writer) (io.WriteCloser, error) {
+			return flate.NewWriter(w, lvl)
+		})
+	}
+	return &zipWriter{zw: zw}, nil
 }
 
 // zipWriter implements [ArchiveWriter] for zip archives.

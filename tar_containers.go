@@ -10,6 +10,7 @@ package archives
 
 import (
 	"compress/bzip2"
+	"compress/flate"
 	"compress/gzip"
 	"io"
 
@@ -35,12 +36,35 @@ func newZstdReader(r io.Reader) (io.ReadCloser, error) {
 	return io.NopCloser(r), nil
 }
 
+// deflateLevel returns the gzip/zip (deflate) level for level.
+func deflateLevel(level CompressionLevel) int {
+	lvl := flate.DefaultCompression
+	switch level { //nolint:exhaustive // Why: Default is the initial value.
+	case CompressionFastest:
+		lvl = flate.BestSpeed
+	case CompressionBetter:
+		lvl = 8
+	case CompressionBest:
+		lvl = flate.BestCompression
+	}
+	return lvl
+}
+
 // newGzipWriter creates a new gzip writer that writes to w.
-func newGzipWriter(w io.Writer) io.WriteCloser {
-	return gzip.NewWriter(w)
+func newGzipWriter(w io.Writer, level CompressionLevel) (io.WriteCloser, error) {
+	return gzip.NewWriterLevel(w, deflateLevel(level))
 }
 
 // newZstdWriter creates a new zstd writer that writes to w.
-func newZstdWriter(w io.Writer) (io.WriteCloser, error) {
-	return zstd.NewWriter(w)
+func newZstdWriter(w io.Writer, level CompressionLevel) (io.WriteCloser, error) {
+	zl := zstd.SpeedDefault
+	switch level { //nolint:exhaustive // Why: Default is the initial value.
+	case CompressionFastest:
+		zl = zstd.SpeedFastest
+	case CompressionBetter:
+		zl = zstd.SpeedBetterCompression
+	case CompressionBest:
+		zl = zstd.SpeedBestCompression
+	}
+	return zstd.NewWriter(w, zstd.WithEncoderLevel(zl))
 }

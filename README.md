@@ -103,6 +103,20 @@ err := archives.Create(f, "dir-to-archive", archives.CreateOptions{
 if err != nil {}
 ```
 
+Permissions are always stored. Set `PreserveOwnership: true` to also
+store each entry's user and group ID (tar only, on unix). Set
+`CompressionLevel` to one of `CompressionFastest`, `CompressionBetter`
+or `CompressionBest` to trade speed for size. This is also available
+in [archives.WriterOptions].
+
+```go
+err := archives.Create(f, "dir-to-archive", archives.CreateOptions{
+  Extension:         ".tar.zst",
+  CompressionLevel:  archives.CompressionBest,
+  PreserveOwnership: true,
+})
+```
+
 For full control over the entries, use [archives.NewWriter], which
 works much like [tar.Writer].
 
@@ -144,6 +158,7 @@ MPL-2.0
 [archives.NewWriter]: https://pkg.go.dev/go.rgst.io/jaredallard/archives/v2#NewWriter
 [archives.Ext]: https://pkg.go.dev/go.rgst.io/jaredallard/archives/v2#Ext
 [archives.ExtractOptions]: https://pkg.go.dev/go.rgst.io/jaredallard/archives/v2#ExtractOptions
+[archives.WriterOptions]: https://pkg.go.dev/go.rgst.io/jaredallard/archives/v2#WriterOptions
 [archives.Pick]: https://pkg.go.dev/go.rgst.io/jaredallard/archives/v2#Pick
 [io.Reader]: https://pkg.go.dev/io#Reader
 [pkg.go.dev]: https://pkg.go.dev/go.rgst.io/jaredallard/archives/v2

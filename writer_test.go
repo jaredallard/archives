@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"io/fs"
+	"math/rand/v2"
 	"strings"
 	"testing"
 	"time"
@@ -165,4 +166,83 @@ func TestNewWriterErrors(t *testing.T) {
 		assert.NilError(t, err)
 		assert.Assert(t, is.ErrorContains(w.Close(), ""))
 	})
+}
+
+// compressionLevels are all supported compression levels.
+var compressionLevels = []archives.CompressionLevel{
+	archives.CompressionDefault,
+	archives.CompressionFastest,
+	archives.CompressionBetter,
+	archives.CompressionBest,
+}
+
+// compressibleData returns n bytes of deterministic, compressible
+// text.
+func compressibleData(n int) []byte {
+	words := []string{"lorem", "ipsum", "dolor", "sit", "amet", "consectetur", "adipiscing", "elit"}
+	rng := rand.New(rand.NewPCG(1, 2)) //nolint:gosec // Why: Deterministic test data.
+
+	var b bytes.Buffer
+	for b.Len() < n {
+		b.WriteString(words[rng.IntN(len(words))])
+		b.WriteByte(' ')
+	}
+	return b.Bytes()[:n]
+}
+
+// writeWithLevel writes body as a single file to an archive of ext
+// compressed with level.
+func writeWithLevel(t *testing.T, ext string, level archives.CompressionLevel, body []byte) []byte {
+	t.Helper()
+
+	buf := new(bytes.Buffer)
+	w, err := archives.NewWriter(buf, archives.WriterOptions{Extension: ext, CompressionLevel: level})
+	assert.NilError(t, err)
+	assert.NilError(t, w.WriteHeader(&archives.Header{
+		Name: "file.txt", Type: archives.HeaderFile, Size: int64(len(body)), Mode: 0o644,
+	}))
+	_, err = w.Write(body)
+	assert.NilError(t, err)
+	assert.NilError(t, w.Close())
+	return buf.Bytes()
+}
+
+func TestNewWriterCompressionLevels(t *testing.T) {
+	body := compressibleData(1 << 20)
+
+	for _, ext := range writableExtensions {
+		t.Run(ext, func(t *testing.T) {
+			sizes := map[archives.CompressionLevel]int{}
+			for _, level := range compressionLevels {
+				b := writeWithLevel(t, ext, level, body)
+				sizes[level] = len(b)
+
+				entries := readAll(t, bytes.NewReader(b), ext)
+				assert.Equal(t, entries["file.txt"].body, string(body), "level %d", level)
+			}
+
+			// The pure-Go xz encoder only varies its dictionary size, which
+			// doesn't affect small inputs, so only check other formats.
+			switch ext {
+			case ".tar":
+				assert.Equal(t, sizes[archives.CompressionBest], sizes[archives.CompressionFastest])
+			case ".tgz", ".tar.gz", ".tar.zst", ".zip":
+				assert.Assert(t, sizes[archives.CompressionBest] < sizes[archives.CompressionFastest],
+					"best (%d) should be smaller than fastest (%d)",
+					sizes[archives.CompressionBest], sizes[archives.CompressionFastest])
+			}
+		})
+	}
+}
+
+func TestInvalidCompressionLevel(t *testing.T) {
+	_, err := archives.NewWriter(new(bytes.Buffer), archives.WriterOptions{
+		Extension: ".tar.gz", CompressionLevel: archives.CompressionLevel(99),
+	})
+	assert.ErrorContains(t, err, "unknown compression level")
+
+	err = archives.Create(new(bytes.Buffer), t.TempDir(), archives.CreateOptions{
+		Extension: ".tar.gz", CompressionLevel: archives.CompressionLevel(99),
+	})
+	assert.ErrorContains(t, err, "unknown compression level")
 }

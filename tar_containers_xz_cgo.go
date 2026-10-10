@@ -21,7 +21,17 @@ func newXZReader(r io.Reader) (io.ReadCloser, error) {
 	return xz.NewReader(r), nil
 }
 
-// newXZWriter creates a new xz writer that writes to w.
-func newXZWriter(w io.Writer) (io.WriteCloser, error) {
-	return xz.NewWriter(w), nil
+// newXZWriter creates a new xz writer that writes to w. level is
+// mapped to a liblzma preset.
+func newXZWriter(w io.Writer, level CompressionLevel) (io.WriteCloser, error) {
+	preset := xz.DefaultCompression
+	switch level { //nolint:exhaustive // Why: Default is the initial value.
+	case CompressionFastest:
+		preset = xz.BestSpeed
+	case CompressionBetter:
+		preset = 7
+	case CompressionBest:
+		preset = xz.BestCompression
+	}
+	return xz.NewWriterLevel(w, preset), nil
 }

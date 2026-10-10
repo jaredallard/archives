@@ -9,6 +9,7 @@
 package archives
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"time"
@@ -35,6 +36,38 @@ const (
 	// this package (e.g., a device node or FIFO).
 	HeaderUnsupported
 )
+
+// CompressionLevel denotes how strongly an archive is compressed. Each
+// level is mapped to the closest equivalent of the archive's
+// compression format. Uncompressed formats (e.g., tar) ignore it.
+type CompressionLevel int
+
+// Contains the supported compression levels.
+const (
+	// CompressionDefault uses the default level of the compression
+	// format.
+	CompressionDefault CompressionLevel = iota
+
+	// CompressionFastest favors speed over compression ratio.
+	CompressionFastest
+
+	// CompressionBetter compresses better than [CompressionDefault] at
+	// the cost of speed.
+	CompressionBetter
+
+	// CompressionBest favors compression ratio over speed.
+	CompressionBest
+)
+
+// validate returns an error if l is not a known compression level.
+func (l CompressionLevel) validate() error {
+	switch l {
+	case CompressionDefault, CompressionFastest, CompressionBetter, CompressionBest:
+		return nil
+	default:
+		return fmt.Errorf("unknown compression level: %d", l)
+	}
+}
 
 // Header represents metadata about a file in an archive.
 type Header struct {
@@ -117,4 +150,10 @@ type Archiver interface {
 	// Extensions should return a list of supported extensions for this
 	// extractor.
 	Extensions() []string
+}
+
+// levelArchiver is implemented by [Archiver]s that support writing
+// archives with a [CompressionLevel].
+type levelArchiver interface {
+	newWriter(w io.Writer, ext string, level CompressionLevel) (ArchiveWriter, error)
 }
