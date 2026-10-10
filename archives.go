@@ -72,6 +72,14 @@ type ExtractOptions struct {
 	//
 	// Defaults to false.
 	PreserveOwnership bool
+
+	// Sync, if set, will fsync every extracted file and directory before
+	// returning so that the extracted contents are durable (e.g., when
+	// restoring a disk). This can be significantly slower, especially on
+	// macOS where a full flush to the storage device is performed.
+	//
+	// Defaults to false.
+	Sync bool
 }
 
 // ptr returns a pointer to the provided value.
@@ -128,6 +136,13 @@ func Open(r io.Reader, opts OpenOptions) (Archive, error) {
 
 // Extract extracts an archive to the provided destination. The
 // underlying [Archiver] is determined by the extension of the archive.
+//
+// Symlinks and hard links are recreated. Symlink targets are restored
+// as recorded in the archive, but no entry is ever written outside of
+// dest, including through symlinks. Existing files at an entry's path
+// are replaced. Directory metadata (permissions, ownership and times)
+// is applied after all entries have been extracted. Device nodes and
+// FIFOs are not supported and cause an error.
 func Extract(r io.Reader, dest string, opts ExtractOptions) error {
 	applyDefaults(&opts)
 

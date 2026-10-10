@@ -13,8 +13,13 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"io/fs"
 	"sync"
 )
+
+// maxZipSymlinkTarget is the maximum length of a symlink target read
+// from a zip archive. This bounds memory use on malformed archives.
+const maxZipSymlinkTarget = 4096
 
 // _ ensures that tar implements the [Archiver] interface.
 var _ Archiver = (&zip{})
@@ -81,16 +86,34 @@ func (z *zipArchive) Next() (*Header, error) {
 		return nil, fmt.Errorf("failed to open file: %w", err)
 	}
 
-	fType := HeaderFile
-	if f.FileInfo().IsDir() {
-		fType = HeaderDir
+	mode := f.Mode()
+	h := &Header{
+		Name:    f.Name,
+		Size:    int64(f.UncompressedSize64), // #nosec // Why: Not an overflow.
+		Mode:    mode,
+		ModTime: f.Modified,
 	}
 
-	return &Header{
-		Name:    f.Name,
-		Type:    fType,
-		Size:    int64(f.UncompressedSize64), // #nosec // Why: Not an overflow.
-		Mode:    f.Mode(),
-		ModTime: f.Modified,
-	}, nil
+	//nolint:exhaustive // Why: All other types are unsupported.
+	switch mode.Type() {
+	case 0:
+		h.Type = HeaderFile
+	case fs.ModeDir:
+		h.Type = HeaderDir
+	case fs.ModeSymlink:
+		// Zip stores the symlink target as the entry's contents.
+		h.Type = HeaderSymlink
+		target, err := io.ReadAll(io.LimitReader(z.ReadCloser, maxZipSymlinkTarget+1))
+		if err != nil {
+			return nil, fmt.Errorf("failed to read symlink target for %s: %w", f.Name, err)
+		}
+		if len(target) > maxZipSymlinkTarget {
+			return nil, fmt.Errorf("symlink target for %s exceeds %d bytes", f.Name, maxZipSymlinkTarget)
+		}
+		h.Linkname = string(target)
+	default:
+		h.Type = HeaderUnsupported
+	}
+
+	return h, nil
 }

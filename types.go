@@ -22,6 +22,18 @@ type HeaderType int
 const (
 	HeaderFile HeaderType = iota
 	HeaderDir
+
+	// HeaderSymlink is a symbolic link. The target is stored in
+	// [Header.Linkname].
+	HeaderSymlink
+
+	// HeaderHardlink is a hard link to another entry in the archive. The
+	// archive path of the target is stored in [Header.Linkname].
+	HeaderHardlink
+
+	// HeaderUnsupported is an entry type that cannot be extracted by
+	// this package (e.g., a device node or FIFO).
+	HeaderUnsupported
 )
 
 // Header represents metadata about a file in an archive.
@@ -38,6 +50,11 @@ type Header struct {
 
 	// Mode is the file mode.
 	Mode os.FileMode
+
+	// Linkname is the target of a link. For [HeaderSymlink] this is the
+	// symlink target as recorded in the archive. For [HeaderHardlink]
+	// this is the archive path of the linked entry.
+	Linkname string
 
 	// AccessTime is the time the file was last accessed.
 	AccessTime time.Time

@@ -35,6 +35,11 @@ if err != nil {}
 // Do something with the files in dir-to-extract-into
 ```
 
+Symlinks and hard links are restored, and entries are never written
+outside of the destination directory. Set `Sync: true` in
+[archives.ExtractOptions] to fsync every extracted file and directory
+before `Extract` returns (e.g., when restoring a disk).
+
 ### Picking a File out of an Archive
 
 Sometimes you want to only grab a single file out of an archive.
@@ -92,6 +97,7 @@ automatically use a pure-Go implementation instead.
 MPL-2.0
 
 [archives.Ext]: https://pkg.go.dev/go.rgst.io/jaredallard/archives/v2#Ext
+[archives.ExtractOptions]: https://pkg.go.dev/go.rgst.io/jaredallard/archives/v2#ExtractOptions
 [archives.Pick]: https://pkg.go.dev/go.rgst.io/jaredallard/archives/v2#Pick
 [io.Reader]: https://pkg.go.dev/io#Reader
 [pkg.go.dev]: https://pkg.go.dev/go.rgst.io/jaredallard/archives/v2

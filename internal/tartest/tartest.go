@@ -37,9 +37,17 @@ const (
 	ContainerZstd
 )
 
+// Entry is an entry to write to a tar archive. Body is used as the
+// contents of the entry.
+type Entry struct {
+	tar.Header
+	Body string
+}
+
 // Options is a struct for interacting with containers.
 type Options struct {
 	Container Container
+	Entries   []Entry
 }
 
 // OptionFn modifies a [Options] struct.
@@ -53,10 +61,22 @@ func WithContainer(c Container) OptionFn {
 	}
 }
 
-// Create creates a new tar archive with a single file, file.txt,
-// containing the contents "hello world".
+// WithEntries denotes that the provided entries should be written to
+// the tar archive instead of the default file.txt. Typeflag defaults to
+// [tar.TypeReg], Mode to 0o644 and Size to the length of Body.
+func WithEntries(entries ...Entry) OptionFn {
+	return func(o *Options) {
+		o.Entries = entries
+	}
+}
+
+// Create creates a new tar archive. By default, it contains a single
+// file, file.txt, containing the contents "hello world".
 func Create(options ...OptionFn) (io.Reader, error) {
-	opts := &Options{Container: ContainerNone}
+	opts := &Options{
+		Container: ContainerNone,
+		Entries:   []Entry{{Header: tar.Header{Name: "file.txt"}, Body: "hello world"}},
+	}
 	for _, o := range options {
 		o(opts)
 	}
@@ -95,18 +115,23 @@ func Create(options ...OptionFn) (io.Reader, error) {
 		defer container.Close() //nolint:errcheck // Why: Best effort
 	}
 
-	contents := []byte("hello world")
-	if err := tw.WriteHeader(&tar.Header{
-		Name: "file.txt",
-		Size: int64(len(contents)),
-		Mode: 0o644,
-	}); err != nil {
-		return nil, fmt.Errorf("failed to write header: %w", err)
-	}
+	for i := range opts.Entries {
+		e := opts.Entries[i]
+		if e.Typeflag == 0 {
+			e.Typeflag = tar.TypeReg
+		}
+		if e.Mode == 0 {
+			e.Mode = 0o644
+		}
+		e.Size = int64(len(e.Body))
 
-	_, err := tw.Write(contents)
-	if err != nil {
-		return nil, fmt.Errorf("failed to write contents: %w", err)
+		if err := tw.WriteHeader(&e.Header); err != nil {
+			return nil, fmt.Errorf("failed to write header for %s: %w", e.Name, err)
+		}
+
+		if _, err := io.WriteString(tw, e.Body); err != nil {
+			return nil, fmt.Errorf("failed to write contents for %s: %w", e.Name, err)
+		}
 	}
 
 	if err := tw.Close(); err != nil {

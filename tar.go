@@ -73,19 +73,34 @@ func (t *tarArchive) Close() error {
 
 func (t *tarArchive) Next() (*Header, error) {
 	h, err := t.Reader.Next()
+	// PAX global headers carry metadata for the archive, not an entry.
+	for err == nil && h.Typeflag == stdtar.TypeXGlobalHeader {
+		h, err = t.Reader.Next()
+	}
 	if err != nil {
 		return nil, err
 	}
 
-	hType := HeaderFile
-	if h.FileInfo().IsDir() {
+	var hType HeaderType
+	//nolint:staticcheck // Why: TypeRegA is deprecated but still found in old archives.
+	switch h.Typeflag {
+	case stdtar.TypeDir:
 		hType = HeaderDir
+	case stdtar.TypeSymlink:
+		hType = HeaderSymlink
+	case stdtar.TypeLink:
+		hType = HeaderHardlink
+	case stdtar.TypeReg, stdtar.TypeRegA, stdtar.TypeCont, stdtar.TypeGNUSparse:
+		hType = HeaderFile
+	default:
+		hType = HeaderUnsupported
 	}
 
 	return &Header{
 		Name:       h.Name,
 		Type:       hType,
 		Mode:       h.FileInfo().Mode(),
+		Linkname:   h.Linkname,
 		Size:       h.Size,
 		AccessTime: h.AccessTime,
 		ModTime:    h.ModTime,
