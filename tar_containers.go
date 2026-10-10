@@ -34,3 +34,13 @@ func newZstdReader(r io.Reader) (io.ReadCloser, error) {
 	}
 	return io.NopCloser(r), nil
 }
+
+// newGzipWriter creates a new gzip writer that writes to w.
+func newGzipWriter(w io.Writer) io.WriteCloser {
+	return gzip.NewWriter(w)
+}
+
+// newZstdWriter creates a new zstd writer that writes to w.
+func newZstdWriter(w io.Writer) (io.WriteCloser, error) {
+	return zstd.NewWriter(w)
+}

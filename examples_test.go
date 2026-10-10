@@ -1,6 +1,7 @@
 package archives_test
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -68,6 +69,50 @@ func ExampleExtract() {
 	}
 
 	fmt.Println(string(got))
+
+	// Output:
+	// hello world
+}
+
+func ExampleCreate() {
+	// Create a directory containing a file to archive.
+	srcDir, err := os.MkdirTemp("", "archives-test-src")
+	if err != nil {
+		panic(err)
+	}
+	defer os.RemoveAll(srcDir)
+
+	if err := os.WriteFile(filepath.Join(srcDir, "file.txt"), []byte("hello world"), 0o644); err != nil {
+		panic(err)
+	}
+
+	// Create a tar.gz archive containing the directory's contents.
+	var buf bytes.Buffer
+	if err := archives.Create(&buf, srcDir, archives.CreateOptions{
+		Extension: ".tar.gz",
+	}); err != nil {
+		panic(err)
+	}
+
+	// Pick the file back out of the archive.
+	a, err := archives.Open(&buf, archives.OpenOptions{
+		Extension: ".tar.gz",
+	})
+	if err != nil {
+		panic(err)
+	}
+	defer a.Close()
+
+	r, err := archives.Pick(a, archives.PickFilterByName("file.txt"))
+	if err != nil {
+		panic(err)
+	}
+
+	b, err := io.ReadAll(r)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(string(b))
 
 	// Output:
 	// hello world

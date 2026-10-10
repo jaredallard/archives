@@ -83,13 +83,36 @@ type Archive interface {
 	Next() (*Header, error)
 }
 
-// Archiver is an interface for interacting with creating [Archive]s
-// from [io.Reader]s.
+// ArchiveWriter writes entries to an archive. Each entry is started
+// with [ArchiveWriter.WriteHeader], after which the contents of a
+// [HeaderFile] entry are written using the embedded [io.Writer].
+type ArchiveWriter interface {
+	io.Writer
+
+	// WriteHeader starts a new entry described by h. For [HeaderFile]
+	// entries, h.Size must be set to the exact number of bytes that will
+	// be written. The permission, setuid, setgid and sticky bits of
+	// h.Mode are stored, the type is determined by h.Type. AccessTime is
+	// not stored, and UID/GID are only stored by formats that support
+	// them (e.g., tar).
+	WriteHeader(h *Header) error
+
+	// Close finishes writing the archive, flushing any compression. It
+	// does not close the underlying [io.Writer].
+	Close() error
+}
+
+// Archiver is an interface for reading [Archive]s from [io.Reader]s
+// and writing them to [io.Writer]s with an [ArchiveWriter].
 type Archiver interface {
 	// Open opens the provided reader and returns an archive. Depending on
 	// the implementation, this may read the entire archive into memory
 	// (e.g., zip).
 	Open(r io.Reader, ext string) (Archive, error)
+
+	// NewWriter returns an [ArchiveWriter] that writes an archive of the
+	// provided extension to w.
+	NewWriter(w io.Writer, ext string) (ArchiveWriter, error)
 
 	// Extensions should return a list of supported extensions for this
 	// extractor.

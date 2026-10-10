@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"strings"
 	"sync"
 )
 
@@ -21,7 +22,7 @@ import (
 // from a zip archive. This bounds memory use on malformed archives.
 const maxZipSymlinkTarget = 4096
 
-// _ ensures that tar implements the [Archiver] interface.
+// _ ensures that zip implements the [Archiver] interface.
 var _ Archiver = (&zip{})
 
 // zip implements the [Archiver] interface for zip archives.
@@ -116,4 +117,80 @@ func (z *zipArchive) Next() (*Header, error) {
 	}
 
 	return h, nil
+}
+
+// NewWriter returns an [ArchiveWriter] that writes a zip archive to w.
+func (z *zip) NewWriter(w io.Writer, _ string) (ArchiveWriter, error) {
+	return &zipWriter{zw: stdzip.NewWriter(w)}, nil
+}
+
+// zipWriter implements [ArchiveWriter] for zip archives.
+type zipWriter struct {
+	zw *stdzip.Writer
+
+	// cur is the writer for the contents of the current file entry, or
+	// nil if the current entry has no contents.
+	cur io.Writer
+}
+
+// WriteHeader starts a new zip entry for h. Hard links are not
+// supported by the zip format.
+func (z *zipWriter) WriteHeader(h *Header) error {
+	z.cur = nil
+
+	fh := &stdzip.FileHeader{
+		Name:     h.Name,
+		Modified: h.ModTime,
+		Method:   stdzip.Store,
+	}
+	mode := h.Mode & (fs.ModePerm | fs.ModeSetuid | fs.ModeSetgid | fs.ModeSticky)
+
+	switch h.Type {
+	case HeaderFile:
+		fh.Method = stdzip.Deflate
+	case HeaderDir:
+		mode |= fs.ModeDir
+		if !strings.HasSuffix(fh.Name, "/") {
+			fh.Name += "/"
+		}
+	case HeaderSymlink:
+		mode |= fs.ModeSymlink
+	case HeaderHardlink:
+		return fmt.Errorf("zip archives do not support hard links: %s", h.Name)
+	case HeaderUnsupported:
+		return fmt.Errorf("unsupported header type (%s: %v)", h.Name, h.Type)
+	default:
+		return fmt.Errorf("unknown header type (%s: %v)", h.Name, h.Type)
+	}
+	fh.SetMode(mode)
+
+	w, err := z.zw.CreateHeader(fh)
+	if err != nil {
+		return fmt.Errorf("failed to write header for %s: %w", h.Name, err)
+	}
+
+	switch h.Type { //nolint:exhaustive // Why: Other types have no contents.
+	case HeaderFile:
+		z.cur = w
+	case HeaderSymlink:
+		// Zip stores the symlink target as the entry's contents.
+		if _, err := io.WriteString(w, h.Linkname); err != nil {
+			return fmt.Errorf("failed to write symlink target for %s: %w", h.Name, err)
+		}
+	}
+
+	return nil
+}
+
+// Write writes to the current file entry.
+func (z *zipWriter) Write(p []byte) (int, error) {
+	if z.cur == nil {
+		return 0, fmt.Errorf("current zip entry is not a file")
+	}
+	return z.cur.Write(p)
+}
+
+// Close finishes the zip archive.
+func (z *zipWriter) Close() error {
+	return z.zw.Close()
 }

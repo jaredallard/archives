@@ -49,6 +49,31 @@ type OpenOptions struct {
 	Extension string
 }
 
+// WriterOptions contains the options for writing an archive.
+type WriterOptions struct {
+	// Extension is the extension of the archive to write. This is
+	// required.
+	//
+	// Extension should be complete, including the leading period. For
+	// example:
+	//		 .tar
+	// 		 .tar.gz
+	Extension string
+}
+
+// CreateOptions contains the options for creating an archive from a
+// directory.
+type CreateOptions struct {
+	// Extension is the extension of the archive to create. This is
+	// required.
+	//
+	// Extension should be complete, including the leading period. For
+	// example:
+	//		 .tar
+	// 		 .tar.gz
+	Extension string
+}
+
 // ExtractOptions contains the options for extracting an archive.
 type ExtractOptions struct {
 	// Extension is the extension of the archive to extract. This is
@@ -128,17 +153,46 @@ func Ext(name string) string {
 func Open(r io.Reader, opts OpenOptions) (Archive, error) {
 	if r == nil {
 		return nil, fmt.Errorf("reader must not be nil")
-	} else if opts.Extension == "" {
-		return nil, fmt.Errorf("extension must be provided (set opts.Extension)")
 	}
 
-	ext := strings.TrimPrefix(opts.Extension, ".")
+	archiver, ext, err := archiverFor(opts.Extension)
+	if err != nil {
+		return nil, err
+	}
+	return archiver.Open(r, ext)
+}
+
+// archiverFor returns the [Archiver] for the provided extension, along
+// with the extension without its leading period.
+func archiverFor(extension string) (Archiver, string, error) {
+	if extension == "" {
+		return nil, "", fmt.Errorf("extension must be provided (set opts.Extension)")
+	}
+
+	ext := strings.TrimPrefix(extension, ".")
 
 	archiver, ok := extensions[ext]
 	if !ok || archiver == nil {
-		return nil, fmt.Errorf("unsupported archive extension: %s", ext)
+		return nil, "", fmt.Errorf("unsupported archive extension: %s", ext)
 	}
-	return archiver.Open(r, ext)
+	return archiver, ext, nil
+}
+
+// NewWriter returns an [ArchiveWriter] that writes an archive to w. The
+// underlying [Archiver] is determined by the extension of the archive.
+//
+// The caller must call [ArchiveWriter.Close] to finish the archive.
+// Creating bzip2 compressed archives is not supported.
+func NewWriter(w io.Writer, opts WriterOptions) (ArchiveWriter, error) {
+	if w == nil {
+		return nil, fmt.Errorf("writer must not be nil")
+	}
+
+	archiver, ext, err := archiverFor(opts.Extension)
+	if err != nil {
+		return nil, err
+	}
+	return archiver.NewWriter(w, ext)
 }
 
 // Extract extracts an archive to the provided destination. The
@@ -161,6 +215,35 @@ func Extract(r io.Reader, dest string, opts ExtractOptions) error {
 	}
 
 	return extract(a, dest, &opts)
+}
+
+// Create creates an archive containing the contents of the directory
+// src and writes it to w. The underlying [Archiver] is determined by
+// the extension of the archive. Entry names are relative to src.
+//
+// Symlinks are never followed. They are stored as symlinks with their
+// target exactly as it is on disk, even if it points outside of src or
+// does not exist. Ownership is not stored and hard links are stored as
+// regular files. Device nodes, FIFOs and sockets are not supported and
+// cause an error. w must not write into src.
+func Create(w io.Writer, src string, opts CreateOptions) error {
+	//nolint:staticcheck // Why: CreateOptions will gain fields WriterOptions doesn't have.
+	aw, err := NewWriter(w, WriterOptions{
+		Extension: opts.Extension,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create archive: %w", err)
+	}
+
+	if err := create(aw, src); err != nil {
+		aw.Close() //nolint:errcheck // Why: Best effort, already failed.
+		return err
+	}
+
+	if err := aw.Close(); err != nil {
+		return fmt.Errorf("failed to finish archive: %w", err)
+	}
+	return nil
 }
 
 // PickFilterFn is a function that filters files in an archive.

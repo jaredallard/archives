@@ -26,3 +26,8 @@ func newXZReader(r io.Reader) (io.ReadCloser, error) {
 
 	return io.NopCloser(wr), nil
 }
+
+// newXZWriter creates a new xz writer that writes to w.
+func newXZWriter(w io.Writer) (io.WriteCloser, error) {
+	return xz.NewWriter(w)
+}

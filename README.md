@@ -1,12 +1,12 @@
 # archives
 
-Go library for extracting archives (tar, zip, etc.)
+Go library for extracting and creating archives (tar, zip, etc.)
 
 ## Supported Archive Types
 
 - `tar`
   - `tar.xz` - xz
-  - `tar.bz2` - bzip2
+  - `tar.bz2` - bzip2 (extraction only)
   - `tar.gz` - gzip
   - `tar.zst` - zstd
 - `zip`
@@ -86,9 +86,53 @@ if err != nil {}
 a.Close()
 ```
 
+### Creating Archives
+
+[archives.Create] packs the contents of a directory into an archive.
+Symlinks are stored as symlinks (never followed) with their targets
+exactly as they are on disk.
+
+```go
+f, err := os.Create("dir.tar.gz")
+if err != nil {}
+defer f.Close()
+
+err := archives.Create(f, "dir-to-archive", archives.CreateOptions{
+  Extension: archives.Ext("dir.tar.gz"),
+})
+if err != nil {}
+```
+
+For full control over the entries, use [archives.NewWriter], which
+works much like [tar.Writer].
+
+```go
+w, err := archives.NewWriter(f, archives.WriterOptions{
+  Extension: ".zip",
+})
+if err != nil {}
+
+body := []byte("hello world")
+err = w.WriteHeader(&archives.Header{
+  Name: "file.txt",
+  Type: archives.HeaderFile,
+  Size: int64(len(body)),
+  Mode: 0o644,
+})
+if err != nil {}
+
+_, err = w.Write(body)
+if err != nil {}
+
+// Finish the archive. This does not close f.
+err = w.Close()
+```
+
+Creating bzip2 compressed archives is not supported.
+
 ### CGO
 
-CGO is used for extracting `xz` archives by default. If you wish to not
+CGO is used for extracting and creating `xz` archives by default. If you wish to not
 use CGO, simply set `CGO_ENABLED` to `0`. This library will
 automatically use a pure-Go implementation instead.
 
@@ -96,9 +140,12 @@ automatically use a pure-Go implementation instead.
 
 MPL-2.0
 
+[archives.Create]: https://pkg.go.dev/go.rgst.io/jaredallard/archives/v2#Create
+[archives.NewWriter]: https://pkg.go.dev/go.rgst.io/jaredallard/archives/v2#NewWriter
 [archives.Ext]: https://pkg.go.dev/go.rgst.io/jaredallard/archives/v2#Ext
 [archives.ExtractOptions]: https://pkg.go.dev/go.rgst.io/jaredallard/archives/v2#ExtractOptions
 [archives.Pick]: https://pkg.go.dev/go.rgst.io/jaredallard/archives/v2#Pick
 [io.Reader]: https://pkg.go.dev/io#Reader
 [pkg.go.dev]: https://pkg.go.dev/go.rgst.io/jaredallard/archives/v2
 [tar.Reader]: https://pkg.go.dev/archive/tar#Reader
+[tar.Writer]: https://pkg.go.dev/archive/tar#Writer

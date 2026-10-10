@@ -20,3 +20,8 @@ import (
 func newXZReader(r io.Reader) (io.ReadCloser, error) {
 	return xz.NewReader(r), nil
 }
+
+// newXZWriter creates a new xz writer that writes to w.
+func newXZWriter(w io.Writer) (io.WriteCloser, error) {
+	return xz.NewWriter(w), nil
+}
