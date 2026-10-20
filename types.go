@@ -140,7 +140,7 @@ type ArchiveWriter interface {
 type Archiver interface {
 	// Open opens the provided reader and returns an archive. Depending on
 	// the implementation, this may read the entire archive into memory
-	// (e.g., zip).
+	// (e.g., zip, unless r implements [io.ReaderAt] and [io.Seeker]).
 	Open(r io.Reader, ext string) (Archive, error)
 
 	// NewWriter returns an [ArchiveWriter] that writes an archive of the

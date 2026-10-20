@@ -170,6 +170,11 @@ func Ext(name string) string {
 
 // Open opens an archive from the provided reader. The underlying
 // [Archiver] is determined by the extension of the archive.
+//
+// Zip archives require random access. If r implements [io.ReaderAt]
+// and [io.Seeker] (e.g., [os.File]), the archive is read in place and r
+// must remain open until the caller is done with the [Archive].
+// Otherwise, the entire zip archive is read into memory.
 func Open(r io.Reader, opts OpenOptions) (Archive, error) {
 	if r == nil {
 		return nil, fmt.Errorf("reader must not be nil")
@@ -225,6 +230,8 @@ func NewWriter(w io.Writer, opts WriterOptions) (ArchiveWriter, error) {
 
 // Extract extracts an archive to the provided destination. The
 // underlying [Archiver] is determined by the extension of the archive.
+// Zip archives are read into memory unless r implements [io.ReaderAt]
+// and [io.Seeker] (e.g., [os.File]), see [Open].
 //
 // Symlinks and hard links are recreated. Symlink targets are restored
 // as recorded in the archive, but no entry is ever written outside of

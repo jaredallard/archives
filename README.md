@@ -40,6 +40,12 @@ outside of the destination directory. Set `Sync: true` in
 [archives.ExtractOptions] to fsync every extracted file and directory
 before `Extract` returns (e.g., when restoring a disk).
 
+Zip archives require random access. When the reader implements
+[io.ReaderAt] and [io.Seeker] (e.g., an [os.File]), the archive is read
+in place. Otherwise (e.g., an HTTP response body), the entire zip
+archive is read into memory first, so prefer passing a file for large
+zip archives.
+
 ### Picking a File out of an Archive
 
 Sometimes you want to only grab a single file out of an archive.
@@ -161,6 +167,9 @@ MPL-2.0
 [archives.WriterOptions]: https://pkg.go.dev/go.rgst.io/jaredallard/archives/v2#WriterOptions
 [archives.Pick]: https://pkg.go.dev/go.rgst.io/jaredallard/archives/v2#Pick
 [io.Reader]: https://pkg.go.dev/io#Reader
+[io.ReaderAt]: https://pkg.go.dev/io#ReaderAt
+[io.Seeker]: https://pkg.go.dev/io#Seeker
+[os.File]: https://pkg.go.dev/os#File
 [pkg.go.dev]: https://pkg.go.dev/go.rgst.io/jaredallard/archives/v2
 [tar.Reader]: https://pkg.go.dev/archive/tar#Reader
 [tar.Writer]: https://pkg.go.dev/archive/tar#Writer

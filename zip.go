@@ -38,19 +38,56 @@ func (z *zip) Extensions() []string {
 }
 
 // Open creates a new [Archive] from the provided reader using the zip
-// format. Due to the nature of zip archives, the entire archive is read
-// into memory.
+// format. Zip archives require random access, so if r implements
+// [io.ReaderAt] and [io.Seeker] (e.g., [os.File]) the archive is read
+// in place, starting at r's current position. Otherwise, the entire
+// archive is read into memory.
+//
+// When read in place, r must not be closed or used until the caller is
+// done with the returned [Archive].
 func (z *zip) Open(r io.Reader, _ string) (Archive, error) {
-	b, err := io.ReadAll(r)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read archive: %w", err)
+	ra, size, ok := readerAt(r)
+	if !ok {
+		b, err := io.ReadAll(r)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read archive: %w", err)
+		}
+		ra, size = bytes.NewReader(b), int64(len(b))
 	}
 
-	zr, err := stdzip.NewReader(bytes.NewReader(b), int64(len(b)))
+	zr, err := stdzip.NewReader(ra, size)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create zip reader: %w", err)
 	}
 	return &zipArchive{zr: zr}, nil
+}
+
+// readerAt returns r as an [io.ReaderAt] starting at r's current
+// position along with its remaining size, if r supports random access.
+// On success, r is left positioned at its end.
+func readerAt(r io.Reader) (io.ReaderAt, int64, bool) {
+	ra, ok := r.(io.ReaderAt)
+	if !ok {
+		return nil, 0, false
+	}
+	s, ok := r.(io.Seeker)
+	if !ok {
+		return nil, 0, false
+	}
+
+	// Seeking fails on some readers that implement io.Seeker (e.g.,
+	// pipes), in which case r is still usable as a stream.
+	cur, err := s.Seek(0, io.SeekCurrent)
+	if err != nil {
+		return nil, 0, false
+	}
+	end, err := s.Seek(0, io.SeekEnd)
+	if err != nil {
+		s.Seek(cur, io.SeekStart) //nolint:errcheck // Why: Best effort.
+		return nil, 0, false
+	}
+
+	return io.NewSectionReader(ra, cur, end-cur), end - cur, true
 }
 
 // zipArchive is an implementation of the Archive interface for zip
